@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>약 복용 체커 (Medication Tracker)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts (Inter & Noto Sans KR) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar & mobile tap highlight cleanup */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen font-sans transition-colors duration-200">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <div class="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                    <i data-lucide="pill" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight">약 복용 체커</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400" id="currentDateStr">오늘의 일정을 확인하세요</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1">
+                <button id="themeToggleBtn" onclick="toggleDarkMode()" class="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+                    <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto p-4 pb-24 space-y-4">
+
+        <!-- Date Selector Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
+            <button onclick="changeDate(-1)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-slate-600 dark:text-slate-300">
+                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center space-x-2">
+                <i data-lucide="calendar" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <input type="date" id="datePicker" onchange="onDateChange(this.value)" class="bg-transparent text-center font-bold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer">
+            </div>
+            <button onclick="changeDate(1)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-slate-600 dark:text-slate-300">
+                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Weekly Progress Card -->
+        <div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-lg shadow-emerald-500/10">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider text-emerald-100">오늘의 복용 달성률</span>
+                <span class="text-sm font-bold" id="progressPercent">0%</span>
+            </div>
+            <div class="w-full bg-emerald-950/30 rounded-full h-2.5 overflow-hidden mb-3">
+                <div id="progressBar" class="bg-white h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <p class="text-xs text-emerald-100/90" id="progressText">선택된 날짜의 남은 약을 확인해보세요.</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex space-x-1 bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-sm font-medium">
+            <button onclick="switchTab('today')" id="tabBtn-today" class="flex-1 py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm">
+                일일 체크
+            </button>
+            <button onclick="switchTab('weekly')" id="tabBtn-weekly" class="flex-1 py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900">
+                주간 특별
+            </button>
+            <button onclick="switchTab('logs')" id="tabBtn-logs" class="flex-1 py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900">
+                복용 기록로그
+            </button>
+        </div>
+
+        <!-- TAB 1: TODAY DAILY CHECKLIST -->
+        <div id="view-today" class="space-y-4">
+            <!-- Morning Slot -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="p-2 bg-amber-500/10 text-amber-500 rounded-xl">
+                            <i data-lucide="sun" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold">아침 복용</h2>
+                            <span class="text-xs text-slate-400">비타민C, 하이드록시클로로퀸, 아연</span>
+                        </div>
+                    </div>
+                    <span id="badge-morning" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">대기 중</span>
+                </div>
+                <div class="space-y-2" id="list-morning"></div>
+            </div>
+
+            <!-- Afternoon Slot -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="p-2 bg-sky-500/10 text-sky-500 rounded-xl">
+                            <i data-lucide="sun-medium" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold">점심 복용</h2>
+                            <span class="text-xs text-slate-400">비타민C, 하이드록시클로로퀸, 아연</span>
+                        </div>
+                    </div>
+                    <span id="badge-afternoon" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">대기 중</span>
+                </div>
+                <div class="space-y-2" id="list-afternoon"></div>
+            </div>
+
+            <!-- Evening Slot -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                            <i data-lucide="moon-star" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold">저녁 복용</h2>
+                            <span class="text-xs text-slate-400">아르테미시닌</span>
+                        </div>
+                    </div>
+                    <span id="badge-evening" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">대기 중</span>
+                </div>
+                <div class="space-y-2" id="list-evening"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: WEEKLY SPECIAL (IVERMECTIN) -->
+        <div id="view-weekly" class="space-y-4 hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="p-3 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-2xl">
+                        <i data-lucide="shield-alert" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-base">주간 요일 복용 (1회/주)</h2>
+                        <p class="text-xs text-slate-400">주 1회 정기 복용 약제: 이버멕틴</p>
+                    </div>
+                </div>
+
+                <!-- Weekly status banner -->
+                <div id="weeklyStatusBanner" class="p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/40 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-purple-600 dark:text-purple-400 block">이번 주 복용 상태</span>
+                            <span id="weeklyStatusText" class="text-sm font-bold text-purple-900 dark:text-purple-200">복용 전</span>
+                        </div>
+                        <i data-lucide="clock" id="weeklyStatusIcon" class="w-6 h-6 text-purple-500"></i>
+                    </div>
+                </div>
+
+                <div class="space-y-2" id="list-weekly"></div>
+
+                <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-700/40 rounded-xl text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                    <p class="font-semibold text-slate-700 dark:text-slate-300">💡 안내</p>
+                    <p>이버멕틴은 일주일 주기로 관리됩니다. 매주 지정된 요일 또는 편한 요일에 1회 복용 후 체크하세요.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: LOGS & HISTORY -->
+        <div id="view-logs" class="space-y-4 hidden">
+            <!-- Action Toolbar -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60 space-y-3">
+                <h3 class="font-bold text-sm">데이터 백업 및 제어</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="copyLogsToClipboard()" class="flex items-center justify-center space-x-1.5 py-2.5 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 transition">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                        <span>로그 클립보드 복사</span>
+                    </button>
+                    <button onclick="exportJSON()" class="flex items-center justify-center space-x-1.5 py-2.5 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 transition">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>JSON 내보내기</span>
+                    </button>
+                </div>
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                    <span class="text-xs text-slate-400">전체 기록 개수: <strong id="logCount">0</strong>개</span>
+                    <button onclick="confirmClearLogs()" class="text-xs text-rose-500 hover:text-rose-600 font-semibold flex items-center space-x-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>로그 전체 삭제</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Log History Table Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60">
+                <h3 class="font-bold text-base mb-3 flex items-center space-x-2">
+                    <i data-lucide="history" class="w-4 h-4 text-emerald-500"></i>
+                    <span>복용 이력 로그</span>
+                </h3>
+                
+                <div class="overflow-x-auto max-h-96 overflow-y-auto no-scrollbar">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 dark:bg-slate-700/50 text-slate-400 uppercase sticky top-0">
+                            <tr>
+                                <th class="p-2.5 rounded-l-lg">일시</th>
+                                <th class="p-2.5">구분</th>
+                                <th class="p-2.5">약제명</th>
+                                <th class="p-2.5 rounded-r-lg text-right">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                            <!-- Logs injected here -->
+                        </tbody>
+                    </table>
+                    <div id="emptyLogState" class="py-8 text-center text-slate-400 text-xs hidden">
+                        기록된 로그 데이터가 없습니다.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white dark:bg-white/90 dark:text-slate-900 px-4 py-2.5 rounded-full text-xs font-semibold shadow-xl opacity-0 transition-all duration-300 pointer-events-none z-50 flex items-center space-x-2">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 dark:text-emerald-600"></i>
+        <span id="toastMsg">처리되었습니다.</span>
+    </div>
+
+    <!-- APP SCRIPT LOGIC -->
+    <script>
+        // Data Structure & Presets
+        const MED_SCHEDULE = {
+            morning: { title: "아침", items: ["비타민C", "하이드록시클로로퀸", "아연"] },
+            afternoon: { title: "점심", items: ["비타민C", "하이드록시클로로퀸", "아연"] },
+            evening: { title: "저녁", items: ["아르테미시닌"] },
+            weekly: { title: "주간", items: ["이버멕틴"] }
+        };
+
+        // State Management
+        let selectedDate = new Date().toISOString().split('T')[0];
+        let checklistState = {}; // Format: { "YYYY-MM-DD": { "morning_비타민C": true, ... } }
+        let weeklyState = {};    // Format: { "2026-W45": { "weekly_이버멕틴": { taken: true, timestamp: "..." } } }
+        let logs = [];           // Array of log objects
+
+        // Initialize App
+        window.onload = function() {
+            loadStorage();
+            initDatePicker();
+            renderAll();
+            lucide.createIcons();
+        };
+
+        // Storage Management
+        function loadStorage() {
+            try {
+                checklistState = JSON.parse(localStorage.getItem('med_checklist_state') || '{}');
+                weeklyState = JSON.parse(localStorage.getItem('med_weekly_state') || '{}');
+                logs = JSON.parse(localStorage.getItem('med_logs') || '[]');
+            } catch (e) {
+                console.error("Storage Load Error:", e);
+            }
+        }
+
+        function saveStorage() {
+            localStorage.setItem('med_checklist_state', JSON.stringify(checklistState));
+            localStorage.setItem('med_weekly_state', JSON.stringify(weeklyState));
+            localStorage.setItem('med_logs', JSON.stringify(logs));
+        }
+
+        // Date Helpers
+        function initDatePicker() {
+            const picker = document.getElementById('datePicker');
+            picker.value = selectedDate;
+            updateDateHeader();
+        }
+
+        function onDateChange(val) {
+            if (!val) return;
+            selectedDate = val;
+            updateDateHeader();
+            renderAll();
+        }
+
+        function changeDate(offset) {
+            const current = new Date(selectedDate);
+            current.setDate(current.getDate() + offset);
+            selectedDate = current.toISOString().split('T')[0];
+            document.getElementById('datePicker').value = selectedDate;
+            updateDateHeader();
+            renderAll();
+        }
+
+        function updateDateHeader() {
+            const d = new Date(selectedDate);
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            const formatted = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+            document.getElementById('currentDateStr').innerText = formatted;
+        }
+
+        function getWeekKey(dateStr) {
+            const d = new Date(dateStr);
+            d.setHours(0, 0, 0, 0);
+            d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+            const yearStart = new Date(d.getFullYear(), 0, 1);
+            const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return `${d.getFullYear()}-W${weekNo < 10 ? '0' + weekNo : weekNo}`;
+        }
+
+        // UI Render Pipeline
+        function renderAll() {
+            renderDailySlot('morning', 'list-morning', 'badge-morning');
+            renderDailySlot('afternoon', 'list-afternoon', 'badge-afternoon');
+            renderDailySlot('evening', 'list-evening', 'badge-evening');
+            renderWeeklySlot();
+            updateProgress();
+            renderLogs();
+            lucide.createIcons();
+        }
+
+        function renderDailySlot(slotKey, containerId, badgeId) {
+            const container = document.getElementById(containerId);
+            const badge = document.getElementById(badgeId);
+            const items = MED_SCHEDULE[slotKey].items;
+            const dayData = checklistState[selectedDate] || {};
+
+            let completedCount = 0;
+            container.innerHTML = '';
+
+            items.forEach(med => {
+                const itemKey = `${slotKey}_${med}`;
+                const isChecked = !!dayData[itemKey];
+                if (isChecked) completedCount++;
+
+                const btn = document.createElement('div');
+                btn.onclick = () => toggleMed(slotKey, med);
+                btn.className = `flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    isChecked 
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200' 
+                        : 'bg-slate-50 dark:bg-slate-700/40 border-slate-200/60 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                }`;
+
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                            isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                        }">
+                            ${isChecked ? '<i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>' : ''}
+                        </div>
+                        <span class="font-medium text-sm ${isChecked ? 'line-through opacity-80' : ''}">${med}</span>
+                    </div>
+                    <span class="text-xs text-slate-400">${isChecked ? '복용 완료' : '미복용'}</span>
+                `;
+                container.appendChild(btn);
+            });
+
+            // Update Badge Status
+            if (completedCount === items.length && items.length > 0) {
+                badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300";
+                badge.innerText = "완료";
+            } else if (completedCount > 0) {
+                badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300";
+                badge.innerText = `${completedCount}/${items.length}`;
+            } else {
+                badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500";
+                badge.innerText = "대기 중";
+            }
+        }
+
+        function renderWeeklySlot() {
+            const container = document.getElementById('list-weekly');
+            const weekKey = getWeekKey(selectedDate);
+            const currentWeekData = weeklyState[weekKey] || {};
+            const med = MED_SCHEDULE.weekly.items[0]; // 이버멕틴
+            const isChecked = !!(currentWeekData[med] && currentWeekData[med].taken);
+
+            const bannerText = document.getElementById('weeklyStatusText');
+            const bannerIcon = document.getElementById('weeklyStatusIcon');
+
+            if (isChecked) {
+                bannerText.innerText = `완료됨 (${currentWeekData[med].date || ''})`;
+                bannerIcon.className = "w-6 h-6 text-emerald-500";
+            } else {
+                bannerText.innerText = `이번 주 (${weekKey}) 복용 미완료`;
+                bannerIcon.className = "w-6 h-6 text-purple-500";
+            }
+
+            container.innerHTML = '';
+            const btn = document.createElement('div');
+            btn.onclick = () => toggleWeeklyMed(med);
+            btn.className = `flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
+                isChecked 
+                    ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-200' 
+                    : 'bg-slate-50 dark:bg-slate-700/40 border-slate-200/60 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+            }`;
+
+            btn.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${
+                        isChecked ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                    }">
+                        ${isChecked ? '<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>' : ''}
+                    </div>
+                    <div>
+                        <span class="font-bold text-sm block ${isChecked ? 'line-through opacity-80' : ''}">${med}</span>
+                        <span class="text-xs text-slate-400">주 1회 필수 복용</span>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${isChecked ? 'bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200' : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'}">
+                    ${isChecked ? '이번주 복용완료' : '복용하기'}
+                </span>
+            `;
+            container.appendChild(btn);
+        }
+
+        // Toggle Actions
+        function toggleMed(slotKey, medName) {
+            if (!checklistState[selectedDate]) {
+                checklistState[selectedDate] = {};
+            }
+
+            const itemKey = `${slotKey}_${medName}`;
+            const nextState = !checklistState[selectedDate][itemKey];
+            checklistState[selectedDate][itemKey] = nextState;
+
+            // Log event timestamp
+            const now = new Date();
+            const timestamp = now.toLocaleString('ko-KR');
+            
+            logs.unshift({
+                id: Date.now(),
+                date: selectedDate,
+                slot: MED_SCHEDULE[slotKey].title,
+                med: medName,
+                action: nextState ? "복용 완료" : "복용 취소",
+                timestamp: timestamp
+            });
+
+            saveStorage();
+            renderAll();
+            showToast(`${MED_SCHEDULE[slotKey].title} ${medName} ${nextState ? '복용 표시되었습니다' : '취소되었습니다'}`);
+        }
+
+        function toggleWeeklyMed(medName) {
+            const weekKey = getWeekKey(selectedDate);
+            if (!weeklyState[weekKey]) {
+                weeklyState[weekKey] = {};
+            }
+
+            const current = !!(weeklyState[weekKey][medName] && weeklyState[weekKey][medName].taken);
+            const nextState = !current;
+            const now = new Date();
+
+            weeklyState[weekKey][medName] = {
+                taken: nextState,
+                timestamp: now.toLocaleString('ko-KR'),
+                date: selectedDate
+            };
+
+            logs.unshift({
+                id: Date.now(),
+                date: selectedDate,
+                slot: `주간(${weekKey})`,
+                med: medName,
+                action: nextState ? "복용 완료" : "복용 취소",
+                timestamp: now.toLocaleString('ko-KR')
+            });
+
+            saveStorage();
+            renderAll();
+            showToast(`주간 약제 [${medName}] ${nextState ? '복용 등록되었습니다' : '취소되었습니다'}`);
+        }
+
+        // Progress Calculation
+        function updateProgress() {
+            const dayData = checklistState[selectedDate] || {};
+            const totalDaily = MED_SCHEDULE.morning.items.length + MED_SCHEDULE.afternoon.items.length + MED_SCHEDULE.evening.items.length;
+            
+            let checkedCount = 0;
+            ['morning', 'afternoon', 'evening'].forEach(slot => {
+                MED_SCHEDULE[slot].items.forEach(med => {
+                    if (dayData[`${slot}_${med}`]) checkedCount++;
+                });
+            });
+
+            const percent = Math.round((checkedCount / totalDaily) * 100);
+            document.getElementById('progressPercent').innerText = `${percent}%`;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+
+            const textEl = document.getElementById('progressText');
+            if (percent === 100) {
+                textEl.innerText = "🎉 오늘 설정된 일일 약 복용을 모두 완료하셨습니다!";
+            } else if (percent > 0) {
+                textEl.innerText = `오늘 총 ${totalDaily}개 약 중 ${checkedCount}개 복용 완료.`;
+            } else {
+                textEl.innerText = "아직 오늘 복용한 약이 없습니다. 잊지말고 챙겨드세요!";
+            }
+        }
+
+        // Log Render
+        function renderLogs() {
+            const tbody = document.getElementById('logTableBody');
+            const emptyState = document.getElementById('emptyLogState');
+            document.getElementById('logCount').innerText = logs.length;
+
+            tbody.innerHTML = '';
+            if (logs.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            // Render top 50 recent logs
+            logs.slice(0, 50).forEach(log => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-700/30";
+                
+                const isComplete = log.action.includes("완료");
+
+                tr.innerHTML = `
+                    <td class="p-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                        <div class="font-medium text-slate-700 dark:text-slate-200">${log.date}</div>
+                        <div class="text-[10px] text-slate-400">${log.timestamp.split(' ').slice(3).join(' ')}</div>
+                    </td>
+                    <td class="p-2.5 whitespace-nowrap font-medium">${log.slot}</td>
+                    <td class="p-2.5 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-100">${log.med}</td>
+                    <td class="p-2.5 whitespace-nowrap text-right">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isComplete ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                        }">
+                            ${log.action}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Tab Switcher
+        function switchTab(tabName) {
+            ['today', 'weekly', 'logs'].forEach(t => {
+                const view = document.getElementById(`view-${t}`);
+                const btn = document.getElementById(`tabBtn-${t}`);
+                if (t === tabName) {
+                    view.classList.remove('hidden');
+                    btn.className = "flex-1 py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm font-bold";
+                } else {
+                    view.classList.add('hidden');
+                    btn.className = "flex-1 py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900";
+                }
+            });
+        }
+
+        // Data Export & Backup Functions
+        function copyLogsToClipboard() {
+            if (logs.length === 0) {
+                showToast("복사할 로그가 없습니다.");
+                return;
+            }
+            let text = "[약 복용 기록 로그 목록]\n";
+            logs.forEach(l => {
+                text += `[${l.timestamp}] ${l.date} | ${l.slot} | ${l.med} -> ${l.action}\n`;
+            });
+
+            // Modern & Fallback Copy
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast("로그가 클립보드에 복사되었습니다!");
+                }).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+            showToast("로그가 클립보드에 복사되었습니다!");
+        }
+
+        function exportJSON() {
+            const data = {
+                checklistState,
+                weeklyState,
+                logs
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `medication_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("백업파일이 다운로드되었습니다.");
+        }
+
+        function confirmClearLogs() {
+            if (confirm("정말로 모든 약 복용 기록 로그를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+                logs = [];
+                checklistState = {};
+                weeklyState = {};
+                saveStorage();
+                renderAll();
+                showToast("모든 데이터가 초기화되었습니다.");
+            }
+        }
+
+        // Toast Helper
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+
+        // Dark Mode Toggle
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>
