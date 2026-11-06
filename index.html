@@ -121,7 +121,7 @@
                         </div>
                         <div>
                             <h2 class="font-bold">아침 복용</h2>
-                            <span class="text-xs text-slate-400">비타민C, 하이드록시클로로퀸, 아연</span>
+                            <span class="text-xs text-slate-400">비타민C</span>
                         </div>
                     </div>
                     <span id="badge-morning" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">대기 중</span>
@@ -138,7 +138,7 @@
                         </div>
                         <div>
                             <h2 class="font-bold">점심 복용</h2>
-                            <span class="text-xs text-slate-400">비타민C, 하이드록시클로로퀸, 아연</span>
+                            <span class="text-xs text-slate-400">하이드록시클로로퀸, 아연</span>
                         </div>
                     </div>
                     <span id="badge-afternoon" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">대기 중</span>
@@ -161,6 +161,20 @@
                     <span id="badge-evening" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">대기 중</span>
                 </div>
                 <div class="space-y-2" id="list-evening"></div>
+            </div>
+
+            <!-- 7-Day Weekly Visual Graph Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-sm flex items-center space-x-2">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-500"></i>
+                        <span>최근 7일 복용 통계</span>
+                    </h3>
+                    <span class="text-[11px] text-slate-400">일일 달성률 (%)</span>
+                </div>
+                <div class="flex items-end justify-between h-32 pt-4 px-1 gap-1" id="weeklyGraphContainer">
+                    <!-- Bars injected by JS -->
+                </div>
             </div>
         </div>
 
@@ -261,8 +275,8 @@
     <script>
         // Data Structure & Presets
         const MED_SCHEDULE = {
-            morning: { title: "아침", items: ["비타민C", "하이드록시클로로퀸", "아연"] },
-            afternoon: { title: "점심", items: ["비타민C", "하이드록시클로로퀸", "아연"] },
+            morning: { title: "아침", items: ["비타민C"] },
+            afternoon: { title: "점심", items: ["하이드록시클로로퀸", "아연"] },
             evening: { title: "저녁", items: ["아르테미시닌"] },
             weekly: { title: "주간", items: ["이버멕틴"] }
         };
@@ -344,6 +358,7 @@
             renderDailySlot('evening', 'list-evening', 'badge-evening');
             renderWeeklySlot();
             updateProgress();
+            renderWeeklyGraph();
             renderLogs();
             lucide.createIcons();
         }
@@ -524,6 +539,50 @@
                 textEl.innerText = `오늘 총 ${totalDaily}개 약 중 ${checkedCount}개 복용 완료.`;
             } else {
                 textEl.innerText = "아직 오늘 복용한 약이 없습니다. 잊지말고 챙겨드세요!";
+            }
+        }
+
+        // Render 7-Day Visual Bar Chart
+        function renderWeeklyGraph() {
+            const container = document.getElementById('weeklyGraphContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const todayObj = new Date(selectedDate);
+            const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+            const totalDaily = MED_SCHEDULE.morning.items.length + MED_SCHEDULE.afternoon.items.length + MED_SCHEDULE.evening.items.length;
+
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(todayObj);
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toISOString().split('T')[0];
+                const dayLabel = daysOfWeek[d.getDay()];
+
+                const dayData = checklistState[dateStr] || {};
+                let count = 0;
+                ['morning', 'afternoon', 'evening'].forEach(slot => {
+                    MED_SCHEDULE[slot].items.forEach(med => {
+                        if (dayData[`${slot}_${med}`]) count++;
+                    });
+                });
+
+                const pct = Math.round((count / totalDaily) * 100);
+                const isSelected = dateStr === selectedDate;
+
+                const col = document.createElement('div');
+                col.className = 'flex-1 flex flex-col items-center justify-end h-full group cursor-pointer';
+                col.onclick = () => onDateChange(dateStr);
+
+                col.innerHTML = `
+                    <span class="text-[10px] text-slate-400 font-semibold mb-1 ${pct === 100 ? 'text-emerald-500' : ''}">${pct}%</span>
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg h-20 flex items-end overflow-hidden p-0.5">
+                        <div class="w-full rounded-t-md transition-all duration-300 ${
+                            isSelected ? 'bg-emerald-500' : 'bg-emerald-400/60 dark:bg-emerald-500/50'
+                        }" style="height: ${Math.max(pct, 6)}%"></div>
+                    </div>
+                    <span class="text-[11px] font-bold mt-1.5 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}">${dayLabel}</span>
+                `;
+                container.appendChild(col);
             }
         }
 
